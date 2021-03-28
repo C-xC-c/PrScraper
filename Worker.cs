@@ -4,6 +4,7 @@ using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
@@ -14,7 +15,12 @@ namespace PrScraper
     {
         public DateTime TimeStamp => DateTime.Now;
 
-        public readonly Dictionary<string, PullRequest> PullRequests = new Dictionary<string, PullRequest>();
+        public readonly Dictionary<string, PullRequest> PullRequests;
+
+        public PullRequestInfo(Dictionary<string, PullRequest>? pullRequests)
+        {
+            PullRequests = pullRequests ?? new Dictionary<string, PullRequest>();
+        }
     }
 
     public class Worker : BackgroundService
@@ -25,15 +31,29 @@ namespace PrScraper
 
         private readonly HttpClient _client = new HttpClient();
 
-        private readonly PullRequestInfo _prs = new PullRequestInfo();
+        private readonly PullRequestInfo _prs;
 
         private readonly ILogger<Worker> _logger;
 
         public Worker(ILogger<Worker> logger, Config config)
         {
+            if (config.FilePath is null)
+            {
+                throw new ArgumentNullException("You must set a FilePath in appsettings.json", nameof(config.FilePath));
+            }
+
             _logger = logger;
             _client.DefaultRequestHeaders.Add("User-Agent", "rms-support-letter");
-            _filePath = config.FilePath;
+            _filePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory!, config.FilePath);
+
+            try
+            {
+                _prs = new PullRequestInfo(JsonConvert.DeserializeObject<PullRequestInfo>(File.ReadAllText(_filePath))?.PullRequests);
+            }
+            catch (FileNotFoundException)
+            {
+                _prs = new PullRequestInfo(null);
+            }
         }
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -51,6 +71,20 @@ namespace PrScraper
                 {
                     _logger.LogInformation($"Parsing page {page}");
                     var resp = await _client.GetAsync(string.Format(_url, page));
+
+                    if (!resp.IsSuccessStatusCode)
+                    {
+                        if (resp.StatusCode == System.Net.HttpStatusCode.Forbidden)
+                        {
+                            DateTime rateLimit = DateTime.Parse(resp.Headers.GetValues("x-ratelimit-reset").First());
+
+                            // We've hit ratelimit, sleep until headers say we can talk to the API again.
+                            _logger.LogInformation($"Rate limited, waiting until {rateLimit} to continue");
+                            await Task.Delay(rateLimit - DateTime.UtcNow);
+                            continue;
+                        }
+                    }
+
                     var body = await resp.Content.ReadAsStringAsync();
 
                     if (body.AsSpan().SequenceEqual("[]"))
@@ -58,7 +92,7 @@ namespace PrScraper
                         break;
                     }
 
-                    List<GithubPullRequest> pullRequests = JsonConvert.DeserializeObject<List<GithubPullRequest>>(body);
+                    List<GithubPullRequest> pullRequests = JsonConvert.DeserializeObject<List<GithubPullRequest>>(body)!;
 
                     foreach (var pr in pullRequests)
                     {
@@ -75,12 +109,11 @@ namespace PrScraper
                         }
 
                         PullRequest pullRequest = new PullRequest(pr);
-
-                        if (pr.Body.Length == 0 || pr.Body.AsSpan().StartsWith("<!--\r\n###"))
+                        if (!ValidateBody(pr.Body))
                         {
                             continue;
                         }
-                        
+
                         // This handles if a new PR is made while we're scraping and pushes an old one down a page.
                         if (!_prs.PullRequests.TryAdd(pr.Number, pullRequest))
                         {
@@ -100,6 +133,26 @@ namespace PrScraper
 
                 await Task.Delay(TimeSpan.FromHours(1), stoppingToken);
             }
+        }
+
+        public static bool ValidateBody(ReadOnlySpan<char> body)
+        {
+            if (body.IsEmpty)
+            {
+                return false;
+            }
+
+            if (body.StartsWith("<!--\r\n###"))
+            {
+                return false;
+            }
+
+            if (body.SequenceEqual("\r\n"))
+            {
+                return false;
+            }
+
+            return true;
         }
     }
 }
