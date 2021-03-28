@@ -73,7 +73,15 @@ namespace PrScraper
                             newestPr = num;
                         }
 
-                        if (!_prs.PullRequests.TryAdd(pr.Number, new PullRequest(pr)))
+                        PullRequest pullRequest = new PullRequest(pr);
+
+                        if (pr.Body.Length == 0 || pr.Body.AsSpan().StartsWith("<!--\r\n###"))
+                        {
+                            continue;
+                        }
+                        
+                        // This handles if a new PR is made while we're scraping and pushes an old one down a page.
+                        if (!_prs.PullRequests.TryAdd(pr.Number, pullRequest))
                         {
                             _logger.LogError($"Tried to add pr that already exists {pr.Number}, {JsonConvert.SerializeObject(pr)}");
                         }
