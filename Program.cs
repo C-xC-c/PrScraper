@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 
 namespace PrScraper
 {
@@ -20,8 +21,10 @@ namespace PrScraper
             Host.CreateDefaultBuilder(args)
                 .ConfigureServices((hostContext, services) =>
                 {
-                    Config config = hostContext.Configuration.GetSection("Config").Get<Config>();
-                    services.AddSingleton(config);
+                    IConfiguration config = hostContext.Configuration;
+
+                    services.AddSingleton(config.GetSection("Config").Get<Config>());
+                    services.AddLogging(loggingBuilder => loggingBuilder.AddFile(config.GetSection("Logging")));
                     services.AddHostedService<Worker>();
                 });
     }
