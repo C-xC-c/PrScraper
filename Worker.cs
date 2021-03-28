@@ -47,8 +47,9 @@ namespace PrScraper
                 int page = 1;
                 int newestPr = lastPr;
 
-                while (true)
+                while (!stoppingToken.IsCancellationRequested)
                 {
+                    _logger.LogInformation($"Parsing page {page}");
                     var resp = await _client.GetAsync(string.Format(_url, page));
                     var body = await resp.Content.ReadAsStringAsync();
 
@@ -87,7 +88,6 @@ namespace PrScraper
                         }
                     }
 
-                    _logger.LogInformation($"Parsed page {page}");
                     page += 1;
                 }
 
