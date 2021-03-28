@@ -74,8 +74,10 @@ namespace PrScraper
 
                 while (!stoppingToken.IsCancellationRequested)
                 {
-                    _logger.LogInformation($"Parsing page {page}");
+                    _logger.LogDebug($"Parsing page {page}");
                     var resp = await _client.GetAsync(string.Format(_url, page)).ConfigureAwait(false);
+
+                    _logger.LogDebug($"Got response {resp.StatusCode} from Githhub");
 
                     if (!resp.IsSuccessStatusCode)
                     {
