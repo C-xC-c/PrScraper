@@ -59,6 +59,10 @@ namespace PrScraper
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
             int lastPr = 0;
+            if (_prs.PullRequests.Count > 0)
+            {
+                lastPr = _prs.PullRequests.Max(x => int.Parse(x.Key));
+            }
 
             while (!stoppingToken.IsCancellationRequested)
             {
