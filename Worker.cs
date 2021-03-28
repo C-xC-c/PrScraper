@@ -76,23 +76,15 @@ namespace PrScraper
                 {
                     _logger.LogDebug($"Parsing page {page}");
                     var resp = await _client.GetAsync(string.Format(_url, page)).ConfigureAwait(false);
-
-                    _logger.LogDebug($"Got response {resp.StatusCode} from Githhub");
+                    var body = await resp.Content.ReadAsStringAsync().ConfigureAwait(false);
 
                     if (!resp.IsSuccessStatusCode)
                     {
-                        if (resp.StatusCode == System.Net.HttpStatusCode.Forbidden)
-                        {
-                            DateTime rateLimit = DateTime.Parse(resp.Headers.GetValues("x-ratelimit-reset").First());
+                        _logger.LogError($"Got bad response from github: {resp.StatusCode}, {body}");
 
-                            // We've hit ratelimit, sleep until headers say we can talk to the API again.
-                            _logger.LogInformation($"Rate limited, waiting until {rateLimit} to continue");
-                            await Task.Delay(rateLimit - DateTime.UtcNow).ConfigureAwait(false);
-                            continue;
-                        }
+                        // We most likely got rate limited, so just sleep for another hour.
+                        goto sleep;
                     }
-
-                    var body = await resp.Content.ReadAsStringAsync().ConfigureAwait(false);
 
                     if (body.AsSpan().SequenceEqual("[]"))
                     {
@@ -122,7 +114,7 @@ namespace PrScraper
                         // This handles if a new PR is made while we're scraping and pushes an old one down a page.
                         if (!_prs.PullRequests.TryAdd(pr.Number, pullRequest))
                         {
-                            _logger.LogError($"Tried to add pr that already exists {pr.Number}, {JsonConvert.SerializeObject(pr)}");
+                            _logger.LogWarning($"Tried to add pr that already exists {pr.Number}, {JsonConvert.SerializeObject(pr)}");
                         }
                     }
 
@@ -136,6 +128,7 @@ namespace PrScraper
                 File.WriteAllText(_filePath, JsonConvert.SerializeObject(_prs, Formatting.Indented));
                 _logger.LogInformation($"Saved file {_filePath}");
 
+            sleep:
                 await Task.Delay(TimeSpan.FromHours(1), stoppingToken).ConfigureAwait(false);
             }
 
