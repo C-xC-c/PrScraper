@@ -62,6 +62,7 @@ namespace PrScraper
             if (_prs.PullRequests.Count > 0)
             {
                 lastPr = _prs.PullRequests.Max(x => int.Parse(x.Key));
+                _logger.LogInformation($"Pull request file already exists, setting lastPr to {lastPr}");
             }
 
             while (!stoppingToken.IsCancellationRequested)
