@@ -87,6 +87,7 @@ namespace PrScraper
                         }
                     }
 
+                    _logger.LogInformation($"Parsed page {page}");
                     page += 1;
                 }
 
