@@ -11,18 +11,6 @@ using System.Threading.Tasks;
 
 namespace PrScraper
 {
-    public class PullRequestInfo
-    {
-        public DateTime TimeStamp => DateTime.Now;
-
-        public readonly Dictionary<string, PullRequest> PullRequests;
-
-        public PullRequestInfo(Dictionary<string, PullRequest>? pullRequests)
-        {
-            PullRequests = pullRequests ?? new Dictionary<string, PullRequest>();
-        }
-    }
-
     public class Worker : BackgroundService
     {
         private const string _url = "https://api.github.com/repos/rms-support-letter/rms-support-letter.github.io/pulls?state=all&per_page=100&page={0}";
@@ -61,7 +49,7 @@ namespace PrScraper
             int lastPr = 0;
             if (_prs.PullRequests.Count > 0)
             {
-                lastPr = _prs.PullRequests.Max(x => int.Parse(x.Key));
+                lastPr = _prs.PullRequests.Max(x => x.Key);
                 _logger.LogInformation($"Pull request file already exists, setting lastPr to {lastPr}");
             }
 
@@ -93,26 +81,24 @@ namespace PrScraper
 
                     foreach (var pr in JsonConvert.DeserializeObject<List<GithubPullRequest>>(body)!)
                     {
-                        int num = int.Parse(pr.Number);
-                        if (lastPr > num)
+                        if (lastPr > pr.Number)
                         {
                             // We've already seen all the prs after this, exit loop.
                             goto end;
                         }
 
-                        if (num > newestPr)
+                        if (pr.Number > newestPr)
                         {
-                            newestPr = num;
+                            newestPr = pr.Number;
                         }
 
-                        PullRequest pullRequest = new PullRequest(pr);
                         if (!ValidateBody(pr.Body))
                         {
                             continue;
                         }
 
                         // This handles if a new PR is made while we're scraping and pushes an old one down a page.
-                        if (!_prs.PullRequests.TryAdd(pr.Number, pullRequest))
+                        if (!_prs.PullRequests.TryAdd(pr.Number, new PullRequest(pr)))
                         {
                             _logger.LogWarning($"Tried to add pr that already exists {pr.Number}, {JsonConvert.SerializeObject(pr)}");
                         }
@@ -136,23 +122,8 @@ namespace PrScraper
         }
 
         public static bool ValidateBody(ReadOnlySpan<char> body)
-        {
-            if (body.IsEmpty)
-            {
-                return false;
-            }
-
-            if (body.StartsWith("<!--\r\n###"))
-            {
-                return false;
-            }
-
-            if (body.SequenceEqual("\r\n"))
-            {
-                return false;
-            }
-
-            return true;
-        }
+            => !body.IsEmpty
+            && !body.StartsWith("<!--\r\n###")
+            && !body.SequenceEqual("\r\n");
     }
 }

@@ -1,7 +1,23 @@
 ﻿using Newtonsoft.Json;
+using System;
+using System.Collections.Generic;
 
 namespace PrScraper
 {
+    public class PullRequestInfo
+    {
+        public DateTime TimeStamp => DateTime.Now;
+
+        public readonly SortedDictionary<int, PullRequest> PullRequests;
+
+        public PullRequestInfo(SortedDictionary<int, PullRequest>? pullRequests)
+        {
+            pullRequests ??= new SortedDictionary<int, PullRequest>();
+
+            PullRequests = new SortedDictionary<int, PullRequest>(pullRequests, new DescendingComparer<int>());
+        }
+    }
+
     public readonly struct PullRequest
     {
         public readonly string Title;

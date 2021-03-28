@@ -6,7 +6,7 @@ namespace PrScraper
     public readonly struct GithubPullRequest
     {
         [DataMember(Name = "number")]
-        public readonly string Number;
+        public readonly int Number;
 
         [DataMember(Name = "title")]
         public readonly string Title;
@@ -17,7 +17,7 @@ namespace PrScraper
         [DataMember(Name = "body")]
         public readonly string Body;
 
-        public GithubPullRequest(string number, string title, GithubUser user, string body)
+        public GithubPullRequest(int number, string title, GithubUser user, string body)
             => (Number, Title, User, Body) = (number, title, user, body);
     }
 
