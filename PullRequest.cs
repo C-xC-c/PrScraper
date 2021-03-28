@@ -1,4 +1,6 @@
-﻿namespace PrScraper
+﻿using Newtonsoft.Json;
+
+namespace PrScraper
 {
     public readonly struct PullRequest
     {
@@ -7,6 +9,10 @@
         public readonly string User;
 
         public readonly string Body;
+
+        [JsonConstructor]
+        public PullRequest(string title, string user, string body)
+            => (Title, User, Body) = (title, user, body);
 
         public PullRequest(GithubPullRequest pr)
         {
