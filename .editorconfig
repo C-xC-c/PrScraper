@@ -1,0 +1,4 @@
+﻿[*.cs]
+
+# RCS1089: Use --/++ operator instead of assignment.
+dotnet_diagnostic.RCS1089.severity = none

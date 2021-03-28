@@ -9,7 +9,7 @@ namespace PrScraper
         public string? FilePath { get; set; }
     }
 
-    public class Program
+    public static class Program
     {
         public static void Main(string[] args)
         {

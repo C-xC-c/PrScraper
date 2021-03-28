@@ -70,7 +70,7 @@ namespace PrScraper
                 while (!stoppingToken.IsCancellationRequested)
                 {
                     _logger.LogInformation($"Parsing page {page}");
-                    var resp = await _client.GetAsync(string.Format(_url, page));
+                    var resp = await _client.GetAsync(string.Format(_url, page)).ConfigureAwait(false);
 
                     if (!resp.IsSuccessStatusCode)
                     {
@@ -80,21 +80,19 @@ namespace PrScraper
 
                             // We've hit ratelimit, sleep until headers say we can talk to the API again.
                             _logger.LogInformation($"Rate limited, waiting until {rateLimit} to continue");
-                            await Task.Delay(rateLimit - DateTime.UtcNow);
+                            await Task.Delay(rateLimit - DateTime.UtcNow).ConfigureAwait(false);
                             continue;
                         }
                     }
 
-                    var body = await resp.Content.ReadAsStringAsync();
+                    var body = await resp.Content.ReadAsStringAsync().ConfigureAwait(false);
 
                     if (body.AsSpan().SequenceEqual("[]"))
                     {
                         break;
                     }
 
-                    List<GithubPullRequest> pullRequests = JsonConvert.DeserializeObject<List<GithubPullRequest>>(body)!;
-
-                    foreach (var pr in pullRequests)
+                    foreach (var pr in JsonConvert.DeserializeObject<List<GithubPullRequest>>(body)!)
                     {
                         int num = int.Parse(pr.Number);
                         if (lastPr > num)
@@ -131,8 +129,10 @@ namespace PrScraper
                 File.WriteAllText(_filePath, JsonConvert.SerializeObject(_prs, Formatting.Indented));
                 _logger.LogInformation($"Saved file {_filePath}");
 
-                await Task.Delay(TimeSpan.FromHours(1), stoppingToken);
+                await Task.Delay(TimeSpan.FromHours(1), stoppingToken).ConfigureAwait(false);
             }
+
+            _logger.LogInformation("Shutting down");
         }
 
         public static bool ValidateBody(ReadOnlySpan<char> body)
